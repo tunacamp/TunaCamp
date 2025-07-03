@@ -1,0 +1,10 @@
+tunacamp.c: In function ‘main’:
+tunacamp.c:7:21: warning: variable ‘ret’ set but not used [-Wunused-but-set-variable]
+    7 |                 int ret, logCount;
+      |                     ^~~
+tunacamp.c:5:22: warning: unused variable ‘dataDir’ [-Wunused-variable]
+    5 |                 char dataDir[] = "/home/ric/data/tunacamp";
+      |                      ^~~~~~~
+tunacamp.c:4:33: warning: unused variable ‘pLogFile’ [-Wunused-variable]
+    4 |                 FILE* sLogFile, pLogFile;
+      |                                 ^~~~~~~~
