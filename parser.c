@@ -1,14 +1,37 @@
 #include "tunacamp.h"
 
-struct record** parserecords(FILE* file, char* delim, int* count) {
-	struct record** records;
-	struct record* record;
-	char buffer[BUFF_SIZE];
 
-	*count = 0;
-	records = malloc(sizeof(struct record*));
-	if (records == NULL)
-		return NULL;
+char** tokenize(char*);
+
+int parseList(FILE* file, const int type) {
+	char buffer[BUFF_SIZE];
+	char** tokens;
+
+	session* s;
+	document* d;
+	project* j;
+
+	// initialize the list
+	if (type == sessions) {
+			sessionCount = 0;
+			sessionList = malloc(sizeof(session*));
+			if (sessionList == NULL)
+				return 1;
+	}
+	else if (type == documents) {
+			documentCount = 0;
+			documentList = malloc(sizeof(document*));
+			if (documentList == NULL)
+				return 1;
+	}
+	else if (type == projects) {
+			projectCount = 0;
+			projectList = malloc(sizeof(project*));
+			if (projectList == NULL)
+				return 1;
+	}
+	else
+		return -1;
 
 	while (fgets(buffer, sizeof(buffer), file) != NULL) {
 			// strip newline
@@ -16,75 +39,196 @@ struct record** parserecords(FILE* file, char* delim, int* count) {
 				if (buffer[i] == '\n')
 						buffer[i] = '\0';
 
-		record = malloc(sizeof(struct record));
-		if (record == NULL)
-				return NULL;
+		tokens = tokenize(buffer);
 
-		parserecord(buffer, delim, record);
+		// appending to and growing the list dynamically
+		switch(type) {
+			case documents:
+				d = malloc(sizeof(document));
+				if (d == NULL)
+					return 1;
 
-		records[*count] = record;
-		*count = *count + 1;
+				d->type = atoi(tokens[0]);
+				d->id = tokens[1];
+				d->title = tokens[2];
+				d->startPage = atoi(tokens[3]);
+				d->stopPage = atoi(tokens[4]);
+				d->priority = atoi(tokens[5]);
+				d->status = atoi(tokens[6]);
 
-		records = realloc(records, sizeof(char*) * (*count+1));
-		if (records == NULL)
-			return NULL;
+				documentList[documentCount] = d;
+				++documentCount;
+
+				documentList = realloc(documentList, sizeof(document*) * (documentCount+1));
+				if (documentList == NULL)
+					return 1;
+				break;
+			case sessions:
+				s = malloc(sizeof(session));
+				if (s == NULL)
+					return 1;
+
+				s->type = atoi(tokens[0]);
+				s->startTime = atol(tokens[1]);
+				s->stopTime = atol(tokens[2]);
+				s->id = tokens[3];
+
+				if (s->type == study) {
+					s->startPage = atoi(tokens[4]);
+					s->stopPage = atoi(tokens[5]);
+				}
+
+				sessionList[sessionCount] = s;
+				++sessionCount;
+
+				sessionList = realloc(sessionList, sizeof(session) * (sessionCount+1));
+				if (sessionList == NULL)
+					return 1;
+				break;
+			case projects:
+				j = malloc(sizeof(project));
+				if (j == NULL)
+					return 1;
+
+				j->name = tokens[1];
+				j->description = tokens[2];
+				j->status = atoi(tokens[0]);
+
+				projectList[projectCount] = j;
+				++projectCount;
+
+				projectList = realloc(projectList, sizeof(project*) * (projectCount+1));
+				if (projectList == NULL)
+					return 1;
+				break;
+		}
 	}
 
-	return records;
+	return 0;
 }
 
 
-void parserecord(char* buffer, char* delim, struct record* record) {
+char** tokenize(char* buffer) {
 		int i = 0;
-		union field field;
-		char* token = strtok(buffer, delim);
+		char* token;
+		char** tokens;
+
+		tokens = malloc(sizeof(char*));
+		if (tokens == NULL)
+			return NULL;
+
+		token = strtok(buffer, ":");
 		while (token != NULL) {
-				switch (type(token)) {
-					case 'i': field.i = atoi(token); break;
-					case 's': field.s = strdup(token); break;
-					case 'c': field.c = token[0]; break;
-					case 't': field.t = atol(token); break;
-				}
+			tokens = realloc(tokens, sizeof(char*) * (i+1));
+			if (tokens == NULL)
+				return NULL;
 
-				switch (i) {
-					case 0:	record->f0 = field; break;
-					case 1:	record->f1 = field; break;
-					case 2: record->f2 = field; break;
-					case 3: record->f3 = field; break;
-					case 4: record->f4 = field; break;
-					case 5:	record->f5 = field; break;
-					case 6:	record->f6 = field; break;
-					case 7:	record->f7 = field; break;
-					case 8:	record->f8 = field; break;
-					case 9:	record->f9 = field; break;
-					case 10: record->f10 = field; break;
-				}
-
-				token = strtok(NULL, delim);
-				i++;
+			tokens[i++] = strdup(token);
+			token = strtok(NULL, ":");
 		}
+
+		return tokens;
 }
 
 
-char type(char* string) {
+void freeList(const int type) {
+	int i;
 
-		int len = strlen(string);
+	switch (type) {
+		case documents:
+			for (i = 0; i < documentCount; ++i) {
+				free(documentList[i]->id);
+				free(documentList[i]->title);
+				free(documentList[i]);
+			}
 
-		if (len == 1 && isalpha(string[0]))
-				return 'c';
+			documentList = NULL;
+			break;
+		case sessions:
+			for (i = 0; i < sessionCount; ++i) {;
+				free(sessionList[i]->id);
+				free(sessionList[i]);
+			}
 
-		for (int i = 0; i < len; ++i)
-				if (!isdigit(string[i]))
-						return 's';
+			sessionList = NULL;
+			break;
+		case projects:
+			for (i = 0; i < projectCount; ++i) {
+				free(projectList[i]->name);
+				free(projectList[i]->description);
+				free(projectList[i]);
+			}
 
-		if (atol(string) <= INT_MAX)
-				return 't';
-
-		return 'i';
+			projectList = NULL;
+			break;
+		default:
+			;
+			break;
+	}
 }
 
-void freerecords(struct record** records, const int count) {
-		for (int i = 0; i < count; ++i)
-				free(records[i]);
-		free(records);
+
+int writeList(const int type) {
+	int i;
+	FILE* outFile;
+
+	switch (type) {
+		case sessions:
+			outFile = freopen(NULL, "w", sessionListFile);
+			break;
+		case projects:
+			outFile = freopen(NULL, "w", projectListFile);
+			break;
+		case documents:
+			outFile = freopen(NULL, "w", documentListFile);
+			break;
+		default:
+			return 2;
+	}
+
+	if (outFile == NULL)
+		return 1;
+
+	switch (type) {
+		case documents:
+			for (i = 0; i < documentCount; ++i)
+				fprintf(outFile, "%d:%s:%s:%d:%d:%d:%d\n",
+					documentList[i]->type,
+					documentList[i]->id,
+					documentList[i]->title,
+					documentList[i]->startPage,
+					documentList[i]->stopPage,
+					documentList[i]->priority,
+					documentList[i]->status);
+			break;
+		case sessions:
+			for (i = 0; i < sessionCount; ++i) {
+				fprintf(outFile, "%d:%ld:%ld:%s",
+					sessionList[i]->type,
+					sessionList[i]->startTime,
+					sessionList[i]->stopTime,
+					sessionList[i]->id);
+
+				if (sessionList[i]->type == study) {
+					fprintf(outFile, ":%d:%d",
+						sessionList[i]->startPage,
+						sessionList[i]->stopPage);
+				}
+
+				fprintf(outFile, "\n");
+			}
+			break;
+		case projects:
+			for (i = 0; i < projectCount; ++i) {
+				fprintf(outFile, "%d:%s:%s\n",
+					projectList[i]->status,
+					projectList[i]->name,
+					projectList[i]->description);
+			}
+			break;
+		default:
+			return 2;
+	}
+
+	return 0;
 }

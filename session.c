@@ -1,153 +1,194 @@
 #include "tunacamp.h"
 
+int bookmark(char*);
+bool validPageRange(const char*, const int, const int);
 
-extern struct record** books;
-extern int booksc;
-extern struct record** jets;
-extern int jetsc;
 
-int startsession(struct record** sessions, int* count) {
-		struct record* session;
-		time_t now;
-		int booknumber, jetnumber;
+int startSession(void) {
+	int dn, jn;	// document number, jet number
 
-		session = malloc(sizeof(struct record));
-		if (session == NULL)
-			return 1;
+	// we cant't start a sessions when another is open
+	for (int i = 0; i < sessionCount; ++i)
+		if (sessionList[i]->startTime != 0 && sessionList[i]->stopTime == 0) {
+			fprintf(stderr, "Error: another session is open: %s\n",
+				sessionList[i]->id);
+			return 2;
+		}
 
-		now = time(NULL);
-		session->f1.t = now;
-		session->f2.t = 0;	// we don't know the stop time yet
+	session* s = malloc(sizeof(session));
+	if (s == NULL)
+		return 1;
 
-		printf("Enter session type: ");
-		scanf("%c", &session->f0.c);
+	time_t now = time(NULL);
+	s->startTime = now;
+	s->stopTime = 0;	// we don't know the stop time yet
 
-		switch (session->f0.c) {
-			case 'r':
-				printbooks(books, booksc);
-				printf("Select book number: ");
-				scanf("%d", &booknumber);
+	printf("Enter session type: ");
+	scanf("%d", &s->type);
 
-				if (booknumber >= 0 && booknumber < booksc) {
-					// make sure we're not duplicating
-					if (isopen('r', books[booknumber]->f0.s, sessions, *count)) {
-							fprintf(stderr, "%s: session already open\n",
-								books[booknumber]->f0.s);
-							return 2;
-					}
-					session->f3.s = books[booknumber]->f0.s;
-				}
-				else {
-					fprintf(stderr, "Unknown book number: %d\n", booknumber);
-					return 2;
-				}
+	switch (s->type) {
+		case study:
+			printLibrary();
+			printf("Select doc number: ");
+			scanf("%d", &dn);
 
-				printf("Enter start page: ");
-				scanf("%d", &session->f4.i);	//TODO: add page range check
-
-				session->f5.i = 0;	// we don't know the stop page yet
-				break;
-			case 'p':
-				printjets(jets, jetsc);
-				printf("Enter project number: ");
-				scanf("%d", &jetnumber);
-
-				if (jetnumber >= 0 && jetnumber < jetsc) {
-					if (isopen('p', jets[jetnumber]->f0.s, sessions, *count)) {
-						fprintf(stderr, "%s: session already open\n",
-							jets[jetnumber]->f0.s);
-
-						return 2;
-					}
-					
-					session->f3.s = jets[jetnumber]->f0.s;
-				}
-				else {
-					fprintf(stderr, "Unknown jet number: %d\n", jetnumber);
-					return 2;
-				}
-
-				// these field are never unused for project session
-				// initialize them to 0
-				session->f4.i = 0;
-				session->f5.i = 0;
-				break;
-			default:
-				fprintf(stderr, "Unknown session type: %c\n", session->f0.c);
+			if (dn >= 0 && dn < documentCount)
+				s->id = documentList[dn]->id;
+			else {
+				fprintf(stderr, "Unknown doc number: %d\n", dn);
 				return 2;
-		}
+			}
 
-		// these fields are never used in a session record
-		// initialize them to 0
-		session->f6.i = 0;
-		session->f7.i = 0;
-		session->f8.i = 0;
-		session->f9.i = 0;
-		session->f10.i = 0;
+			printf("Enter start page: ");
+			scanf("%d", &s->startPage);
+			// validate start page
+			if (!validPageRange( s->id, s->startPage, s->stopPage)) {
+				fprintf(stderr, "Invalid page range for book: %s(%d, %d)\n",
+					documentList[dn]->id,
+					documentList[dn]->startPage, documentList[dn]->stopPage);
+					return 2;
+			}
 
-		*count = *count + 1;
+			s->stopPage = 0;	// we don't know the stop page yet
 
-		sessions = realloc(sessions, sizeof(struct record*) * (*count));
-		if (sessions == NULL)
+			break;
+		case programming:
+			printProjects();
+			printf("Enter project number: ");
+			scanf("%d", &jn);
+
+			if (jn >= 0 && jn < projectCount) 
+				s->id = projectList[jn]->name;
+			else {
+				fprintf(stderr, "Unknown jet number: %d\n", jn);
+				return 2;
+			}
+			break;
+		default:
+			fprintf(stderr, "Unknown session type: %d\n", s->type);
+			return 2;
+	}
+
+	sessionCount++;
+
+	sessionList = realloc(sessionList, sizeof(session*) * sessionCount);
+	if (sessionList == NULL)
+		return 1;
+
+	sessionList[sessionCount-1] = s;
+
+	return 0;
+}
+
+
+// two adjascent sessions with same session type and ID means
+// the session was paused.
+int pauseSession(void) {
+	int i;
+	time_t now = time(NULL);
+	session* s;
+
+	for (i = 0; i < sessionCount; ++i) {
+		if (sessionList[i]->startTime != 0 && sessionList[i]->stopTime == 0) {
+
+			// mark the session as stopped before cloning
+			sessionList[i]->stopTime = now;
+
+			s = malloc(sizeof(session));
+			if (s == NULL)
 				return 1;
 
-		sessions[*count-1] = session;
+			// clone session type and session ID
+			s->type = sessionList[i]->type;
+			s->id = sessionList[i]->id;
 
-		return 0;
-}
+			// paused session has c:0:0 so that we can test during resume
+			s->startTime = s->stopTime = 0;
 
+			// more work for reading sessions
+			if (s->type == study) {
+				printf("Enter stop page: ");
+				scanf("%d", &sessionList[i]->stopPage);
+				s->startPage = sessionList[i]->stopPage;
+				s->stopPage = 0;
+			}
 
-int pausesession(struct record** sessions, const int count) {
-		return 0;
-}
+			sessionCount++;
+			sessionList = realloc(sessionList, sizeof(session*) * sessionCount);
+			if (sessionList == NULL)
+					return 1;
 
+			sessionList[sessionCount-1] = s;
 
-int resumesession(struct record**sessions, const int count) {
-		return 0;
-}
-
-
-int stopsession(struct record** sessions, const int count) {
-//		int
-		return 0;
-}
-
-
-int writesessions(FILE* file, struct record** sessions, const int count) {
-		int i;
-
-		if (freopen(NULL, "w", file) == NULL)
-				return 1;
-
-		for (i = 0; i < count; ++i) {
-			fprintf(file, "%c:%ld:%ld:%s",
-				sessions[i]->f0.c,
-				sessions[i]->f1.t,
-				sessions[i]->f2.t,
-				sessions[i]->f3.s);
-
-			// reading sessions have more fields, remember?
-			if (sessions[i]->f0.c == 'r')
-						fprintf(file, ":%d:%d",
-							sessions[i]->f4.i,
-							sessions[i]->f5.i);
-
-			fprintf(file, "\n");
+			return 0;
 		}
+	}
 
-		return 0;
+	return 2;
 }
 
 
-bool isopen(char type, char* id, struct record** sessions, const int count) {
+void resumeSession(void) {
+		int i;
+		time_t now = time(NULL);
+
+		for (i = 0; i < sessionCount; ++i)
+			if (sessionList[i]->startTime == 0 && sessionList[i]->stopTime == 0)
+				sessionList[i]->startTime = now;
+}
+
+
+void stopSession(void) {
+	int i;
+	time_t now = time(NULL);
+
+	for (i = 0; i < sessionCount; ++i) {
+		if (sessionList[i]->stopTime == 0) {
+			sessionList[i]->stopTime = now;
+
+			if (sessionList[i]->type == 'r') {
+				printf("Enter stop page: ");
+				scanf("%d", &sessionList[i]->stopPage);
+
+				if (!validPageRange(sessionList[i]->id, sessionList[i]->startPage, sessionList[i]->stopPage)) {
+					fprintf(stderr, "Invalid page stop for book: %s\n", sessionList[i]->id);
+
+					// revert changes
+					sessionList[i]->stopTime = sessionList[i]->stopPage = 0;
+				}
+			}
+		}
+	}
+}
+
+
+int bookmark(char* bookid) {
+	int i, sppage = 0;
+
+	for (i = 0; i < sessionCount; ++i)
+		if (strcmp(sessionList[i]->id, bookid) == 0)
+			if (sessionList[i]->startTime != 0 && sessionList[i]->stopTime != 0)
+				sppage = sessionList[i]->stopPage;
+
+	return sppage;
+}
+
+
+bool validPageRange(const char* bookid, const int start, const int stop) {
 		int i;
 
-		for (i = 0; i < count; ++i) {
-			if (sessions[i]->f0.c == type && strcmp(sessions[i]->f3.s, id) == 0) {
-				if (sessions[i]->f1.t != 0 && sessions[i]->f2.t == 0)
-					return true;
+		if (start > stop && stop != 0)
+			return false;
+
+		for (i = 0; i < documentCount; ++i) {
+			if (strcmp(documentList[i]->id, bookid) == 0) {
+				if (start < documentList[i]->startPage)
+					return false;
+
+				if (stop > documentList[i]->stopPage)
+					return false;
 			}
 		}
 
-		return false;
+		return true;
 }

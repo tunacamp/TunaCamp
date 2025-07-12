@@ -9,78 +9,101 @@
 #include <stdbool.h>
 #include <limits.h>
 
+
 #define BUFF_SIZE 100
-#define BOOKID_SIZE 13
+#define DOCID_SIZE 13
 
 
-union field {
-		int i;
-		time_t t;
-		char* s;
-		char c;
-};
+enum recordType {documents, sessions, projects};
+enum docType {book, documentation, article, periodical};
+enum docPriority {core, essential, important, misc};
+enum status {complete, incomplete};
+enum sessionType {study, programming, art};
 
 
-struct record {
-		union field f0;
-		union field f1;
-		union field f2;
-		union field f3;
-		union field f4;
-		union field f5;
-		union field f6;
-		union field f7;
-		union field f8;
-		union field f9;
-		union field f10;
-};
+typedef struct {
+	int type;
+	time_t startTime;
+	time_t stopTime;
+	char* id;
+	int startPage;
+	int stopPage;
+} session;
 
-/*******************************
- * module parser.c  *
- * *****************************/
 
-struct record** parserecords(FILE*, char*, int*);
-void freerecords(struct record**, const int);
-void parserecord(char*, char*, struct record*);
-char type(char*);
+typedef struct {
+	int type;
+	char* id;
+	char* title;
+	int startPage;	// The absolute pages
+	int stopPage;	// in evince including only the core info.
+	int priority;
+	int status;
+} document;
+
+
+typedef struct {
+	enum status status;
+	char* name;
+	char* description;
+} project;
+
+
+extern session** sessionList;
+extern document** documentList;
+extern project** projectList;
+
+extern int sessionCount;
+extern int documentCount;
+extern int projectCount;
+
+extern FILE* documentListFile;
+extern FILE* sessionListFile;
+extern FILE* projectListFile;
+
+
+
+/*********************************************
+ * module parser.c:                          *
+ * Functions for reading and writing records *
+ * *******************************************/
+
+/* struct record** parserecords(FILE*/
+int parseList(FILE*, const int);
+void freeList(const int);
+int writeList(const int);
 
 
 /********************************
  * module progress.c            *
  * ******************************/
-void printactivity(struct record**, const int);
-void printtoday(struct record**, const int);
-void printsummary(struct record**, const int);
+void printActivity(void);
+void printToday(void);
+void printSummary(void);
 
 
 /*******************************
- * module books.c              *
+ * module library.c              *
  * *****************************/
-void genbookid(char*, struct record**, const int);
-void printbooks(struct record**, const int);
-int addbook(struct record**, int*);
-int removebook(struct record**, int*);
-int modifybook(struct record**, const int);
-int updatebooks(void);
+char* genDocId(void);
+void printLibrary(void);
+int updateLibrary(void);
 
 
 /*************************
  * module sessions.c
  * ***********************/
-int startsession(struct record**, int*);
-int pausesession(struct record**, const int);
-int resumesession(struct record**, const int);
-int stopsession(struct record**, const int);
-int writesessions(FILE*, struct record**, const int);
-bool isopen(char, char*, struct record**, const int);
-
+int startSession(void);
+int pauseSession(void);
+void resumeSession(void);
+void stopSession(void);
 
 /************************
- * module jets.c
+ * module projects.c
  * *********************/
-void printjets(struct record**, const int);
-int addjet(struct record**, int*);
-int removejet(struct record**, int*);
-int modifyjet(struct record**, const int);
+void printProjects(void);
+int addProject(void);
+int deleteProject(void);
+int editProjectInfo(void);
 
 #endif /* tunacamp.h */

@@ -1,16 +1,20 @@
 #include "tunacamp.h"
 
+extern struct record** gSessions;
+extern struct record** gBooks;
+extern int gSessionsCount;
+extern int gBooksCount;
 
-void printactivity(struct record** sessions, const int count) {
-		int i;
+void printactivity(void) {
+	int i;
 
-		for (i = 0; i < count; ++i) {
-				printf("%c %ld %ld %s", sessions[i]->f0.c, sessions[i]->f1.t,
-						sessions[i]->f2.t, sessions[i]->f3.s);
+	for (i = 0; i < gSessionsCount; ++i) {
+		printf("%c %ld %ld %s", gSessions[i]->sessionType, gSessions[i]->startTime,
+			gSessions[i]->stopTime, gSessions[i]->id);
 				
-				if (sessions[i]->f0.c == 'r')
-						printf(" %d %d", sessions[i]->f4.i, sessions[i]->f5.i);
+		if (gSessions[i]->sessionType == 'r')
+			printf(" %d %d", gSessions[i]->startPage, gSessions[i]->stopPage);
 
-				printf("\n");
-		}
+		printf("\n");
+	}
 }
